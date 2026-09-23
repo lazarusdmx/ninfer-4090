@@ -233,6 +233,24 @@ Deliberately NOT taken: nothing dropped this time. Upstream PR #211 (the stream-
 membership publish we carry as `e565fe50`) was closed unmerged by its author on 09-10 and master
 still publishes unordered - the patch stays fork-only.
 
+## Vision budget per item, 2026-09-23 (`328d9aa8`)
+
+A pi session on production failed every turn with `media_budget_exceeded` "vision raw patches
+exceed processor budget" after its eleventh 1282x665 screenshot (request log: 10 images
+admitted, 11 rejected). Agent clients send every earlier image again with each turn, and the
+processor counts all of them. Cause: our `73b42127` (2026-08-18) tied the aggregate prompt
+budget to `--vision-max-tokens` (8192), which was right while the encoder held a whole request.
+Upstream `fc5c4834` (2026-08-24, catch-up #3) encodes one item at a time and splits the budgets
+into 32768 per prompt and 16384 per item; the lockstep survived the merge. The fix restores the
+upstream aggregate and applies `--vision-max-tokens` to the single-item budget, which is what
+the encode workspace holds. Frontend test added (4 x 768 tokens admitted at a 1024 cap, one
+1280-token item rejected). Deployed 2026-09-23 12:50Z as `visbudget-328d9aa8`, rollback
+`bin/ninfer-serve.pre-visbudget-328d9aa8-20260923-1250`. Live check: 12 x 1282x665 (10,080
+tokens) returned 200 with the correct count; one 3200x3200 image (10,000 tokens) returned 400
+`media_budget_exceeded` "single media item raw patches exceed Vision execution capacity". The
+remaining wall is the 32768 aggregate, about 39 such screenshots or 8 images at pi's
+2000x2000 resize cap in one conversation.
+
 ## Community triage 2026-09-22 (issues and PRs opened on this fork)
 
 Six issues and four PRs had accumulated since 2026-08-30 without a reply; the fork was not
